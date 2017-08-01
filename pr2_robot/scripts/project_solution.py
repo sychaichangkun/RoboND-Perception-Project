@@ -79,7 +79,7 @@ def pcl_callback(pcl_msg):
 
     ##### Add statistical outliner filter
     #print(cloud_filtered)
-    #outlier_filter = cloud_filtered.make_statistical_outlier_filter()
+    outlier_filter = cloud_filtered.make_statistical_outlier_filter()
     #
     #outlier_filter.set_mean_k(10)    
     #outlier_filter.set_std_dev_mul_thresh(1.0)
