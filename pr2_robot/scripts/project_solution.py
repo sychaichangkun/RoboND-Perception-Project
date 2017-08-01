@@ -79,11 +79,12 @@ def pcl_callback(pcl_msg):
 
     ##### Add statistical outliner filter
     #print(cloud_filtered)
-    outlier_filter = cloud_filtered.make_statistical_outlier_filter()
-    #
-    #outlier_filter.set_mean_k(10)    
-    #outlier_filter.set_std_dev_mul_thresh(1.0)
-    #cloud_filtered = outlier_filter.filter()
+    #pcl.save(cloud_filtered, 'temp.pcd')
+    #p = pcl.load("temp.pcd")
+    #cloud_filtered = p.make_statistical_outlier_filter()
+    #cloud_filtered.set_mean_k(0)    
+    #cloud_filtered.set_std_dev_mul_thresh(1.0)
+    #cloud_filtered = cloud_filtered.filter()
     #####
 
     # TODO: RANSAC Plane Segmentation
@@ -159,14 +160,14 @@ def pcl_callback(pcl_msg):
         do.cloud = ros_cluster
         detected_objects.append(do)
     # Publish the list of detected objects
-    rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
+    ##rospy.loginfo('Detected {} objects: {}'.format(len(detected_objects_labels), detected_objects_labels))
     detected_objects_pub.publish(detected_objects)
 
     # Suggested location for where to invoke your pr2_mover() function within pcl_callback()
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pass#pr2_mover(detected_objects) ######detected_objects_list
+        pr2_mover(detected_objects)  #detected_objects_list
     except rospy.ROSInterruptException:
         pass
 
@@ -174,22 +175,59 @@ def pcl_callback(pcl_msg):
 def pr2_mover(object_list):
 
     # TODO: Initialize variables
+    object_to_pick_dict={}   #  {object_name: object_group}
 
     # TODO: Get/Read parameters
+    object_list_param = rospy.get_param('/object_list')
 
     # TODO: Parse parameters into individual variables
+    for i in range(len(object_list_param)):
+	object_to_pick_dict[object_list_param[i]['name']] = object_list_param[i]['group']
+    print('objects to pick:',object_to_pick_dict)
 
     # TODO: Rotate PR2 in place to capture side tables for the collision map
 
     # TODO: Loop through the pick list
-
+    labels = []
+    centroids = [] # to be list of tuples (x, y, z)
+    for object in object_list:
         # TODO: Get the PointCloud for a given object and obtain it's centroid
+        labels.append(object.label)
+        points_arr = ros_to_pcl(object.cloud).to_array()
+        object_centroid = np.mean(points_arr, axis=0)[:3]
+        print('Detected',object.label,'with centroid at',object_centroid)
+        centroids.append(object_centroid)
 
+	PICK_POSE = Pose()   ##### PICK_POSE
+	PICK_POSE.position.x = object_centroid[0]
+	PICK_POSE.position.y = object_centroid[1]
+	PICK_POSE.position.z = object_centroid[2]
+        OBJECT_NAME = String()	     ##### OBJECT_NAME
+	OBJECT_NAME.data = object.label   
+        
         # TODO: Create 'place_pose' for the object
+	TEST_SCENE_NUM  = Int32()   #####TEST_SCENE_NUM
+	TEST_SCENE_NUM.data = 1
+        PLACE_POSE = Pose()   #####PLACE_POSE
+	if object_to_pick_dict[object.label] == 'red':
+	    PLACE_POSE.position.x = .0
+	    PLACE_POSE.position.y = -0.5
+	    PLACE_POSE.position.z = .6
+	elif object_to_pick_dict[object.label] == 'green':
+	    PLACE_POSE.position.x = .0
+	    PLACE_POSE.position.y = .5
+	    PLACE_POSE.position.z = .6
 
         # TODO: Assign the arm to be used for pick_place
+	if object_to_pick_dict[object.label] == 'red':
+	    WHICH_ARM = String()   ##### WHICH_ARM
+ 	    WHICH_ARM.data = 'left'
+	elif object_to_pick_dict[object.label] == 'green':
+	    WHICH_ARM = String()   ##### WHICH_ARM
+ 	    WHICH_ARM.data = 'right'
 
         # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
+        
 
         # Wait for 'pick_place_routine' service to come up
         rospy.wait_for_service('pick_place_routine')
