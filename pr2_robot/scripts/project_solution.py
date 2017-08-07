@@ -78,13 +78,10 @@ def pcl_callback(pcl_msg):
     cloud_filtered = passthrough.filter()
 
     ##### Add statistical outliner filter
-    #print(cloud_filtered)
-    #pcl.save(cloud_filtered, 'temp.pcd')
-    #p = pcl.load("temp.pcd")
-    #cloud_filtered = p.make_statistical_outlier_filter()
-    #cloud_filtered.set_mean_k(0)    
-    #cloud_filtered.set_std_dev_mul_thresh(1.0)
-    #cloud_filtered = cloud_filtered.filter()
+    cloud_filtered = cloud_filtered.make_statistical_outlier_filter()
+    cloud_filtered.set_mean_k(3)    
+    cloud_filtered.set_std_dev_mul_thresh(.1)
+    cloud_filtered = cloud_filtered.filter()
     #####
 
     # TODO: RANSAC Plane Segmentation
@@ -167,7 +164,7 @@ def pcl_callback(pcl_msg):
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pr2_mover(detected_objects)  #detected_objects_list
+        pass#pr2_mover(detected_objects)  #detected_objects_list
     except rospy.ROSInterruptException:
         pass
 
@@ -179,15 +176,26 @@ def pr2_mover(object_list):
 
     # TODO: Get/Read parameters
     object_list_param = rospy.get_param('/object_list')
+    dropbox_list = rospy.get_param('/dropbox')
 
     # TODO: Parse parameters into individual variables
+    TEST_SCENE_NUM  = Int32()   #####TEST_SCENE_NUM
+    TEST_SCENE_NUM.data = 1
+    for i in object_list_param:#####sort object_list as param /object_list set
+	for k in range(len(object_list)):
+	    if i['name'] == object_list[k].label:
+		object_list += [object_list.pop(k)]
+    for i in object_list:
+	print(i.label)
+ 
     for i in range(len(object_list_param)):
 	object_to_pick_dict[object_list_param[i]['name']] = object_list_param[i]['group']
-    print('objects to pick:',object_to_pick_dict)
+    print('objects to pick:',object_list_param)
 
     # TODO: Rotate PR2 in place to capture side tables for the collision map
 
     # TODO: Loop through the pick list
+    dict_list = []
     labels = []
     centroids = [] # to be list of tuples (x, y, z)
     for object in object_list:
@@ -195,39 +203,30 @@ def pr2_mover(object_list):
         labels.append(object.label)
         points_arr = ros_to_pcl(object.cloud).to_array()
         object_centroid = np.mean(points_arr, axis=0)[:3]
-        print('Detected',object.label,'with centroid at',object_centroid)
         centroids.append(object_centroid)
 
+        OBJECT_NAME = String()	     ##### OBJECT_NAME
+	OBJECT_NAME.data = object.label   
 	PICK_POSE = Pose()   ##### PICK_POSE
 	PICK_POSE.position.x = object_centroid[0]
 	PICK_POSE.position.y = object_centroid[1]
 	PICK_POSE.position.z = object_centroid[2]
-        OBJECT_NAME = String()	     ##### OBJECT_NAME
-	OBJECT_NAME.data = object.label   
         
         # TODO: Create 'place_pose' for the object
-	TEST_SCENE_NUM  = Int32()   #####TEST_SCENE_NUM
-	TEST_SCENE_NUM.data = 1
+	# TODO: Assign the arm to be used for pick_place
         PLACE_POSE = Pose()   #####PLACE_POSE
-	if object_to_pick_dict[object.label] == 'red':
-	    PLACE_POSE.position.x = .0
-	    PLACE_POSE.position.y = -0.5
-	    PLACE_POSE.position.z = .6
-	elif object_to_pick_dict[object.label] == 'green':
-	    PLACE_POSE.position.x = .0
-	    PLACE_POSE.position.y = .5
-	    PLACE_POSE.position.z = .6
-
-        # TODO: Assign the arm to be used for pick_place
-	if object_to_pick_dict[object.label] == 'red':
-	    WHICH_ARM = String()   ##### WHICH_ARM
- 	    WHICH_ARM.data = 'left'
-	elif object_to_pick_dict[object.label] == 'green':
-	    WHICH_ARM = String()   ##### WHICH_ARM
- 	    WHICH_ARM.data = 'right'
+	WHICH_ARM = String()   ##### WHICH_ARM
+	for i in range(len(dropbox_list)):
+	    if object_to_pick_dict[object.label] == dropbox_list[i]['group']:	
+	        PLACE_POSE.position.x = dropbox_list[i]['position'][0]
+	        PLACE_POSE.position.y = dropbox_list[i]['position'][1]
+	        PLACE_POSE.position.z = dropbox_list[i]['position'][2]
+ 	        WHICH_ARM.data = dropbox_list[i]['name']
 
         # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
-        
+        # Populate various ROS messages
+        yaml_dict = make_yaml_dict(TEST_SCENE_NUM, WHICH_ARM, OBJECT_NAME, PICK_POSE, PLACE_POSE)
+        dict_list.append(yaml_dict)
 
         # Wait for 'pick_place_routine' service to come up
         rospy.wait_for_service('pick_place_routine')
@@ -237,15 +236,15 @@ def pr2_mover(object_list):
 
             # TODO: Insert your message variables to be sent as a service request
             resp = pick_place_routine(TEST_SCENE_NUM, OBJECT_NAME, WHICH_ARM, PICK_POSE, PLACE_POSE)
-
+	    print('TEST_SCENE_NUM',TEST_SCENE_NUM,'OBJECT_NAME',OBJECT_NAME,'WHICH_ARM',WHICH_ARM,'PICK_POSE',PICK_POSE,'PLACE_POSE',PLACE_POSE)
             print ("Response: ",resp.success)
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
 
     # TODO: Output your request parameters into output yaml file
-
-
+    send_to_yaml('solution.yaml',dict_list)
+    print(dict_list)
 
 if __name__ == '__main__':
 
