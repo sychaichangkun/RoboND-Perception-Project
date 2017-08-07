@@ -164,13 +164,12 @@ def pcl_callback(pcl_msg):
     # Could add some logic to determine whether or not your object detections are robust
     # before calling pr2_mover()
     try:
-        pass#pr2_mover(detected_objects)  #detected_objects_list
+        pr2_mover(detected_objects)  #detected_objects_list
     except rospy.ROSInterruptException:
         pass
 
 # function to load parameters and request PickPlace service
 def pr2_mover(object_list):
-
     # TODO: Initialize variables
     object_to_pick_dict={}   #  {object_name: object_group}
 
@@ -180,7 +179,7 @@ def pr2_mover(object_list):
 
     # TODO: Parse parameters into individual variables
     TEST_SCENE_NUM  = Int32()   #####TEST_SCENE_NUM
-    TEST_SCENE_NUM.data = 1
+    TEST_SCENE_NUM.data = 3
     for i in object_list_param:#####sort object_list as param /object_list set
 	for k in range(len(object_list)):
 	    if i['name'] == object_list[k].label:
@@ -193,6 +192,12 @@ def pr2_mover(object_list):
     print('objects to pick:',object_list_param)
 
     # TODO: Rotate PR2 in place to capture side tables for the collision map
+    base_controller_pub.publish(Float64(1.57))
+    rospy.sleep(10.)
+    base_controller_pub.publish(Float64(-1.57))
+    rospy.sleep(20.)
+    base_controller_pub.publish(Float64(0))
+    rospy.sleep(12.)
 
     # TODO: Loop through the pick list
     dict_list = []
@@ -206,12 +211,11 @@ def pr2_mover(object_list):
         centroids.append(object_centroid)
 
         OBJECT_NAME = String()	     ##### OBJECT_NAME
-	OBJECT_NAME.data = object.label   
+	OBJECT_NAME.data = str(object.label)  
 	PICK_POSE = Pose()   ##### PICK_POSE
-	PICK_POSE.position.x = object_centroid[0]
-	PICK_POSE.position.y = object_centroid[1]
-	PICK_POSE.position.z = object_centroid[2]
-        
+	PICK_POSE.position.x = np.asscalar(object_centroid[0])
+	PICK_POSE.position.y = np.asscalar(object_centroid[1])
+	PICK_POSE.position.z = np.asscalar(object_centroid[2])
         # TODO: Create 'place_pose' for the object
 	# TODO: Assign the arm to be used for pick_place
         PLACE_POSE = Pose()   #####PLACE_POSE
@@ -221,13 +225,11 @@ def pr2_mover(object_list):
 	        PLACE_POSE.position.x = dropbox_list[i]['position'][0]
 	        PLACE_POSE.position.y = dropbox_list[i]['position'][1]
 	        PLACE_POSE.position.z = dropbox_list[i]['position'][2]
- 	        WHICH_ARM.data = dropbox_list[i]['name']
-
+ 	        WHICH_ARM.data = str(dropbox_list[i]['name'])
         # TODO: Create a list of dictionaries (made with make_yaml_dict()) for later output to yaml format
         # Populate various ROS messages
         yaml_dict = make_yaml_dict(TEST_SCENE_NUM, WHICH_ARM, OBJECT_NAME, PICK_POSE, PLACE_POSE)
         dict_list.append(yaml_dict)
-
         # Wait for 'pick_place_routine' service to come up
         rospy.wait_for_service('pick_place_routine')
 
@@ -236,15 +238,14 @@ def pr2_mover(object_list):
 
             # TODO: Insert your message variables to be sent as a service request
             resp = pick_place_routine(TEST_SCENE_NUM, OBJECT_NAME, WHICH_ARM, PICK_POSE, PLACE_POSE)
-	    print('TEST_SCENE_NUM',TEST_SCENE_NUM,'OBJECT_NAME',OBJECT_NAME,'WHICH_ARM',WHICH_ARM,'PICK_POSE',PICK_POSE,'PLACE_POSE',PLACE_POSE)
-            print ("Response: ",resp.success)
+
 
         except rospy.ServiceException, e:
             print "Service call failed: %s"%e
 
     # TODO: Output your request parameters into output yaml file
-    send_to_yaml('solution.yaml',dict_list)
     print(dict_list)
+    send_to_yaml('pick_list_3.yaml',dict_list)
 
 if __name__ == '__main__':
 
@@ -260,6 +261,7 @@ if __name__ == '__main__':
     pcl_cluster_pub = rospy.Publisher("/pcl_cluster", PointCloud2, queue_size=1)
     object_markers_pub = rospy.Publisher("/object_markers", Marker, queue_size=1)
     detected_objects_pub = rospy.Publisher("/detected_objects", DetectedObjectsArray, queue_size=1)
+    base_controller_pub = rospy.Publisher("/pr2/world_joint_controller/command", Float64, queue_size=1)
 
     # TODO: Load Model From disk
     model = pickle.load(open('model.sav', 'rb'))

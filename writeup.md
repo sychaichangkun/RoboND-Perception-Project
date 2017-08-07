@@ -1,11 +1,15 @@
-## Project: Perception Pick & Place
-### Writeup Template: You can use this file as a template for your writeup if you want to submit it as a markdown file, but feel free to use some other method and submit a pdf if you prefer.
+# Project: Perception Pick & Place Writeup
+
+#### Student: Chaichangkun
+
+#### Email: sychaichangkun@gmail.com
+
+#### Github: https://github.com/sychaichangkun
 
 ---
 
-
 # Required Steps for a Passing Submission:
-1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify). 
+1. Extract features and train an SVM model on new objects (see `pick_list_*.yaml` in `/pr2_robot/config/` for the list of models you'll be trying to identify).
 2. Write a ROS node and subscribe to `/pr2/world/points` topic. This topic contains noisy point cloud data that you must work with.
 3. Use filtering and RANSAC plane fitting to isolate the objects of interest from the rest of the scene.
 4. Apply Euclidean clustering to create separate clusters for individual items.
@@ -36,33 +40,31 @@ You're reading it!
 
 ### Exercise 1, 2 and 3 pipeline implemented
 #### 1. Complete Exercise 1 steps. Pipeline for filtering and RANSAC plane fitting implemented.
+[Exercise 1](https://github.com/sychaichangkun/RoboND-Perception-Exercises/tree/master/Exercise-1)  is completed with **Voxal Grid Filter**, **PassThrough Filter**, **RANSAC Plane Segmentation** and **Inliers/Outliners Extraction** sequantially applied to the point cloud. Finally the objects and the table are extracted.
 
 #### 2. Complete Exercise 2 steps: Pipeline including clustering for segmentation implemented.  
+As you can see the [template.py](https://github.com/sychaichangkun/RoboND-Perception-Exercises/blob/master/Exercise-2/sensor_stick/scripts/template.py) file in [Exercise 2](https://github.com/sychaichangkun/RoboND-Perception-Exercises/tree/master/Exercise-2), the pipeline includes all steps in [Exercise 1](https://github.com/sychaichangkun/RoboND-Perception-Exercises/tree/master/Exercise-1) and **Euclidean Clustering**, which uses k-d tree to separate cloud points into different clusters. Then the objects, table and colored clusters for visualization are published as ROS messages.
 
-#### 2. Complete Exercise 3 Steps.  Features extracted and SVM trained.  Object recognition implemented.
-Here is an example of how to include an image in your writeup.
+#### 3. Complete Exercise 3 Steps.  Features extracted and SVM trained.  Object recognition implemented.
+[Exercise 3](https://github.com/sychaichangkun/RoboND-Perception-Exercises/tree/master/Exercise-3) does a very meaningful job on capturing features and classifying objects. The pipeline is as follows:
+* Capture features of the 7 models(beer, bowl, create, disk part, hammer, plastic cup, soda can) with both color and normal to surface. The features are filled in a histgram with 32 bins as one channel(256 in total).
 
-![demo-1](https://user-images.githubusercontent.com/20687560/28748231-46b5b912-7467-11e7-8778-3095172b7b19.png)
+* Train SVM classifier with this dataset, choose a kernal of **linear** and gamma and C as default. The validation and testing accuracy seems pretty good(~97%).
+![accuracy](https://github.com/sychaichangkun/RoboND-Perception-Exercises/blob/master/Exercise-3/my_classification_result2.png?raw=true)
 
+* Predict the cloud points with this well trained SVM classifier.
+As you can see in the pictures below, every object is correctly recognized.
+![result](https://github.com/sychaichangkun/RoboND-Perception-Exercises/blob/master/Exercise-3/object_recognition_result.png?raw=true)
 
-
-
-Here's | A | Snappy | Table
---- | --- | --- | ---
-1 | `highlight` | **bold** | 7.41
-2 | a | b | c
-3 | *italic* | text | 403
-4 | 2 | 3 | abcd
+###### NOTE: In Perception-Project, the features are captured from all 16 objects and each with 2000 features. This is an extremly huge dataset. As shown below.
+![big dataset](./pr2_robot/scripts/figure_1.png)
 
 
 ### Pick and Place Setup
 
 #### 1. For all three tabletop setups (`test*.world`), perform object recognition, then read in respective pick list (`pick_list_*.yaml`). Next construct the messages that would comprise a valid `PickPlace` request output them to `.yaml` format.
 
-And here's another image! 
-![demo-2](https://user-images.githubusercontent.com/20687560/28748286-9f65680e-7468-11e7-83dc-f1a32380b89c.png)
+Applying the long-time trained SVM classifier to the cloud point, the objects are all precisely recognized.
+![demo](./pr2_robot/scripts/demo.png)
 
-Spend some time at the end to discuss your code, what techniques you used, what worked and why, where the implementation might fail and how you might improve it if you were going to pursue this project further.  
-
-
-
+The output yaml files are in [scripts](./pr2_robot/scripts) folder.
